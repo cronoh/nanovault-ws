@@ -32,6 +32,10 @@ app.post('/api/new-block', (req, res) => {
   });
 });
 
+app.get('/health-check', (req, res) => {
+  res.sendStatus(200);
+});
+
 app.listen(9960, () => console.log(`Express server online`));
 
 wss.on('connection', function(ws) {
