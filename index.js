@@ -14,6 +14,7 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.post('/api/new-block', (req, res) => {
   res.sendStatus(200);
+  console.log(`Received block`);
 
   const fullBlock = req.body;
   fullBlock.block = JSON.parse(fullBlock.block);
@@ -52,8 +53,7 @@ wss.on('connection', function(ws) {
     }
   });
   ws.on('close', event => {
-    console.log(`Connection closed, unsubscribe?`);
-    console.log(`global map: `, subscriptionMap);
+    console.log(`Connection closed, unsubscribing`);
     ws.subscriptions.forEach(account => {
       if (!subscriptionMap[account] || !subscriptionMap[account].length) return; // Not in there for some reason?
 
@@ -63,15 +63,11 @@ wss.on('connection', function(ws) {
         delete subscriptionMap[account];
       }
     });
-
-    console.log(`Finished cleaning up subscriptions`, ws.subscriptions);
-    console.log(`global map: `, subscriptionMap);
   });
 });
 
 
 function parseEvent(ws, event) {
-  console.log(`Parsing event `, ws, event);
   switch (event.event) {
     case 'subscribe':
       subscribeAccounts(ws, event.data);
@@ -81,7 +77,6 @@ function parseEvent(ws, event) {
 }
 
 function subscribeAccounts(ws, accounts) {
-  console.log(`Subscribing!`);
   accounts.forEach(account => {
     if (ws.subscriptions.indexOf(account) !== -1) return; // Already subscribed
     ws.subscriptions.push(account);
@@ -90,8 +85,6 @@ function subscribeAccounts(ws, accounts) {
     if (!subscriptionMap[account]) {
       subscriptionMap[account] = [];
     }
-
-    console.log(`Added new subscription`);
 
     subscriptionMap[account].push(ws);
   });
