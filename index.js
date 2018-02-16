@@ -6,6 +6,9 @@ const app = express();
 
 const subscriptionMap = {};
 
+// Statistics reporting?
+let tpsCount = 0;
+
 app.use((req, res, next) => {
   if (req.headers['content-type']) return next();
   req.headers['content-type'] = 'application/json';
@@ -15,6 +18,7 @@ app.use(express.json());
 app.post('/api/new-block', (req, res) => {
   res.sendStatus(200);
   console.log(`Received block`);
+  tpsCount++;
 
   const fullBlock = req.body;
   fullBlock.block = JSON.parse(fullBlock.block);
@@ -43,7 +47,6 @@ wss.on('connection', function(ws) {
   ws.subscriptions = [];
   console.log(`Got new connection! `, ws);
   ws.on('message', message => {
-    console.log('Got message', message);
     try {
       const event = JSON.parse(message);
       console.log(`Got event`, event);
@@ -71,7 +74,9 @@ function parseEvent(ws, event) {
   switch (event.event) {
     case 'subscribe':
       subscribeAccounts(ws, event.data);
-      const accounts = event.data;
+      break;
+    case 'unsubscribe':
+      unsubscribeAccounts(ws, event.data);
       break;
   }
 }
@@ -89,5 +94,36 @@ function subscribeAccounts(ws, accounts) {
     subscriptionMap[account].push(ws);
   });
 }
+function unsubscribeAccounts(ws, accounts) {
+  accounts.forEach(account => {
+    const existingSub = ws.subscriptions.indexOf(account);
+    if (existingSub === -1) return; // Not subscribed
+
+    ws.subscriptions.splice(existingSub, 1);
+
+    // Remove from global map
+    if (!subscriptionMap[account]) return; // Nobody subscribed to this account?
+
+    const globalIndex = subscriptionMap[account].indexOf(ws);
+    if (globalIndex === -1) {
+      console.log(`Subscribe, not found in the global map?  Potential leak? `, account);
+      return;
+    }
+
+    subscriptionMap[account].splice(globalIndex, 1);
+  });
+}
+
+const statTime = 10;
+function printStats() {
+  const connectedClients = wss.clients.length;
+  const tps = tpsCount / statTime;
+  console.log(`Connected clients: ${connectedClients}`);
+  console.log(`TPS Average: ${tps}`);
+  tpsCount = 0;
+}
+
+setInterval(printStats, statTime * 1000); // Print stats every 10 seconds
+
 
 console.log(`Websocket server online!`);
