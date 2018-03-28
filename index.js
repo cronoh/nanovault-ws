@@ -1,8 +1,27 @@
+require('dotenv').config(); // Load variables from .env into the environment
+
+/** Configuration **/
+const websocketPort = 3333; // Port that the websocket server will listen on (For incoming wallet connections)
+const webserverPort = 9960; // Port that the webserver will listen on (For receiving new blocks from Nano node)
+const statTime = 10; // Seconds between reporting statistics to console (Connected clients, TPS)
+
+// Set up connection to PostgreSQL server used for storing timestamps (Will fail safely if not used)
+const knex = require('knex')({
+  client: 'pg',
+  connection: {
+    host : process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user : process.env.DB_USER,
+    password : process.env.DB_PASS && '',
+    database : process.env.DB_NAME
+  }
+});
+/** End Configuration **/
+
 const express = require('express');
 const WebSocketServer = require('uws').Server;
-
-const wss = new WebSocketServer({ port: 3333 });
 const app = express();
+const wss = new WebSocketServer({ port: websocketPort });
 
 const subscriptionMap = {};
 
@@ -21,7 +40,13 @@ app.post('/api/new-block', (req, res) => {
   tpsCount++;
 
   const fullBlock = req.body;
-  fullBlock.block = JSON.parse(fullBlock.block);
+  try {
+    fullBlock.block = JSON.parse(fullBlock.block);
+    saveHashTimestamp(fullBlock.hash);
+  } catch (err) {
+    return console.log(`Error parsing block data! `, err.message);
+  }
+
 
   if (fullBlock.block.type !== 'send') return; // Only send for now?
   if (!subscriptionMap[fullBlock.block.destination]) return; // Nobody listening for this
@@ -41,7 +66,7 @@ app.get('/health-check', (req, res) => {
   res.sendStatus(200);
 });
 
-app.listen(9960, () => console.log(`Express server online`));
+app.listen(webserverPort, () => console.log(`Express server online`));
 
 wss.on('connection', function(ws) {
   ws.subscriptions = [];
@@ -69,6 +94,18 @@ wss.on('connection', function(ws) {
   });
 });
 
+async function saveHashTimestamp(hash) {
+  console.log(`Saving hash... `, hash);
+  const d = new Date();
+  try {
+    await knex('timestamps').insert({
+      hash,
+      timestamp: d.getTime() + (d.getTimezoneOffset() * 60 * 1000), // Get milliseconds in UTC
+    });
+  } catch (err) {
+    console.log(`Error saving hash timestamp:`, err.message);
+  }
+}
 
 function parseEvent(ws, event) {
   switch (event.event) {
@@ -114,7 +151,6 @@ function unsubscribeAccounts(ws, accounts) {
   });
 }
 
-const statTime = 10;
 function printStats() {
   const connectedClients = wss.clients.length;
   const tps = tpsCount / statTime;
@@ -123,7 +159,6 @@ function printStats() {
   tpsCount = 0;
 }
 
-setInterval(printStats, statTime * 1000); // Print stats every 10 seconds
-
+setInterval(printStats, statTime * 1000); // Print stats every x seconds
 
 console.log(`Websocket server online!`);
