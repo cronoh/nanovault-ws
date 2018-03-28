@@ -12,10 +12,13 @@ const knex = require('knex')({
     host : process.env.DB_HOST,
     port: process.env.DB_PORT,
     user : process.env.DB_USER,
-    password : process.env.DB_PASS && '',
+    password : process.env.DB_PASS ? process.env.DB_PASS : '',
     database : process.env.DB_NAME
   }
 });
+
+console.log(`Loading with env data.... `, process.env);
+
 /** End Configuration **/
 
 const express = require('express');
@@ -103,7 +106,7 @@ async function saveHashTimestamp(hash) {
       timestamp: d.getTime() + (d.getTimezoneOffset() * 60 * 1000), // Get milliseconds in UTC
     });
   } catch (err) {
-    console.log(`Error saving hash timestamp:`, err.message);
+    console.log(`Error saving hash timestamp:`, err.message, err);
   }
 }
 
