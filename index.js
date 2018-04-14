@@ -51,7 +51,7 @@ app.post('/api/new-block', (req, res) => {
   }
 
 
-  if (fullBlock.block.type !== 'send') return; // Only send for now?
+  // if (fullBlock.block.type !== 'send') return; // Only send for now?
   if (!subscriptionMap[fullBlock.block.destination]) return; // Nobody listening for this
 
   // Send it to all!
