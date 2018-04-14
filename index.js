@@ -17,8 +17,6 @@ const knex = require('knex')({
   }
 });
 
-console.log(`Loading with env data.... `, process.env);
-
 /** End Configuration **/
 
 const express = require('express');
