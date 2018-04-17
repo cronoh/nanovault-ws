@@ -48,22 +48,31 @@ app.post('/api/new-block', (req, res) => {
     return console.log(`Error parsing block data! `, err.message);
   }
 
+  let destinations = [];
+
   if (fullBlock.block.type === 'state') {
+    if (fullBlock.is_send === 'true' && fullBlock.block.link_as_account) {
+      destinations.push(fullBlock.block.link_as_account);
+    }
+    destinations.push(fullBlock.account);
     console.log(`Got state block: `, fullBlock);
+  } else {
+    destinations.push(fullBlock.block.destination);
   }
 
-
-  // if (fullBlock.block.type !== 'send') return; // Only send for now?
-  if (!subscriptionMap[fullBlock.block.destination]) return; // Nobody listening for this
-
   // Send it to all!
-  console.log(`Got relevant block, sending to subscribers!`, fullBlock);
-  subscriptionMap[fullBlock.block.destination].forEach(ws => {
-    const event = {
-      event: 'newTransaction',
-      data: fullBlock
-    };
-    ws.send(JSON.stringify(event));
+  destinations.forEach(destination => {
+    if (!subscriptionMap[destination]) return; // Nobody listening for this
+
+    console.log(`Sending block to ${destination}: `, fullBlock);
+
+    subscriptionMap[destination].forEach(ws => {
+      const event = {
+        event: 'newTransaction',
+        data: fullBlock
+      };
+      ws.send(JSON.stringify(event));
+    });
   });
 });
 
