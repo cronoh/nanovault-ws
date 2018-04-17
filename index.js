@@ -48,6 +48,10 @@ app.post('/api/new-block', (req, res) => {
     return console.log(`Error parsing block data! `, err.message);
   }
 
+  if (fullBlock.block.type === 'state') {
+    console.log(`Got state block: `, fullBlock);
+  }
+
 
   // if (fullBlock.block.type !== 'send') return; // Only send for now?
   if (!subscriptionMap[fullBlock.block.destination]) return; // Nobody listening for this
