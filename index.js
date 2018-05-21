@@ -4,6 +4,7 @@ require('dotenv').config(); // Load variables from .env into the environment
 const websocketPort = 3333; // Port that the websocket server will listen on (For incoming wallet connections)
 const webserverPort = 9960; // Port that the webserver will listen on (For receiving new blocks from Nano node)
 const statTime = 10; // Seconds between reporting statistics to console (Connected clients, TPS)
+const forceStateBlocks = true; // Second canary for state blocks released?
 
 // Set up connection to PostgreSQL server used for storing timestamps (Will fail safely if not used)
 const knex = require('knex')({
@@ -106,6 +107,15 @@ wss.on('connection', function(ws) {
       }
     });
   });
+
+  // If the second canary has released, forcefully tell all clients to use state blocks
+  if (forceStateBlocks) {
+    const newEvent = {
+      event: 'useStateBlocks',
+      data: true
+    };
+    ws.send(JSON.stringify(newEvent));
+  }
 });
 
 async function saveHashTimestamp(hash) {
