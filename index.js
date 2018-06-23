@@ -4,7 +4,6 @@ require('dotenv').config(); // Load variables from .env into the environment
 const websocketPort = 3333; // Port that the websocket server will listen on (For incoming wallet connections)
 const webserverPort = 9960; // Port that the webserver will listen on (For receiving new blocks from Nano node)
 const statTime = 10; // Seconds between reporting statistics to console (Connected clients, TPS)
-const forceStateBlocks = true; // Second canary for state blocks released?
 
 // Set up connection to PostgreSQL server used for storing timestamps (Will fail safely if not used)
 const knex = require('knex')({
@@ -38,7 +37,6 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.post('/api/new-block', (req, res) => {
   res.sendStatus(200);
-  console.log(`Received block`);
   tpsCount++;
 
   const fullBlock = req.body;
@@ -56,7 +54,6 @@ app.post('/api/new-block', (req, res) => {
       destinations.push(fullBlock.block.link_as_account);
     }
     destinations.push(fullBlock.account);
-    console.log(`Got state block: `, fullBlock);
   } else {
     destinations.push(fullBlock.block.destination);
   }
@@ -65,7 +62,7 @@ app.post('/api/new-block', (req, res) => {
   destinations.forEach(destination => {
     if (!subscriptionMap[destination]) return; // Nobody listening for this
 
-    console.log(`Sending block to ${destination}: `, fullBlock);
+    console.log(`Sending block to subscriber ${destination}: `, fullBlock.amount);
 
     subscriptionMap[destination].forEach(ws => {
       const event = {
@@ -85,18 +82,17 @@ app.listen(webserverPort, () => console.log(`Express server online`));
 
 wss.on('connection', function(ws) {
   ws.subscriptions = [];
-  console.log(`Got new connection! `, ws);
+  console.log(`- New Connection`);
   ws.on('message', message => {
     try {
       const event = JSON.parse(message);
-      console.log(`Got event`, event);
       parseEvent(ws, event);
     } catch (err) {
       console.log(`Bad message: `, err);
     }
   });
   ws.on('close', event => {
-    console.log(`Connection closed, unsubscribing`);
+    console.log(`- Connection Closed`);
     ws.subscriptions.forEach(account => {
       if (!subscriptionMap[account] || !subscriptionMap[account].length) return; // Not in there for some reason?
 
@@ -107,19 +103,10 @@ wss.on('connection', function(ws) {
       }
     });
   });
-
-  // If the second canary has released, forcefully tell all clients to use state blocks
-  if (forceStateBlocks) {
-    const newEvent = {
-      event: 'useStateBlocks',
-      data: true
-    };
-    ws.send(JSON.stringify(newEvent));
-  }
 });
 
 async function saveHashTimestamp(hash) {
-  console.log(`Saving hash... `, hash);
+  console.log(`Saving block timestamp: `, hash);
   const d = new Date();
   try {
     await knex('timestamps').insert({
@@ -178,8 +165,7 @@ function unsubscribeAccounts(ws, accounts) {
 function printStats() {
   const connectedClients = wss.clients.length;
   const tps = tpsCount / statTime;
-  console.log(`Connected clients: ${connectedClients}`);
-  console.log(`TPS Average: ${tps}`);
+  console.log(`[Stats] Connected clients: ${connectedClients}; TPS Average: ${tps}`);
   tpsCount = 0;
 }
 
