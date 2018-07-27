@@ -20,7 +20,7 @@ const knex = require('knex')({
 /** End Configuration **/
 
 const express = require('express');
-const WebSocketServer = require('uws').Server;
+const WebSocketServer = require('ws').Server;
 const app = express();
 const wss = new WebSocketServer({ port: websocketPort });
 
